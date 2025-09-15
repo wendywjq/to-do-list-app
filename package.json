@@ -1,0 +1,37 @@
+{
+  "name": "my-app",
+  "version": "0.1.0",
+  "private": true,
+  "main": "public/electron.js",
+  "dependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-scripts": "5.0.1",
+    "uuid": "^13.0.0",
+    "web-vitals": "^5.1.0"
+  },
+  "devDependencies": {
+    "electron": "^29.4.6",
+    "electron-is-dev": "^2.0.0",
+    "electron-packager": "^17.1.1"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "electron": "ELECTRON_START_URL=http://localhost:3000 electron .",
+    "electron-pack": "npm run build && electron-packager . my-app --platform=darwin --arch=x64 --out=dist --overwrite"
+  },
+  "homepage": ".",
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
