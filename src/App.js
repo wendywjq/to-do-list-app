@@ -11,12 +11,14 @@ const statusColors = {
   done: "#52c41a",
   stuck: "#595959",
 };
+
 const priorityColors = {
   "紧急且重要": "#a8071a",
   "紧急": "#fa541c",
   "重要": "#1890ff",
   "日常": "#d9d9d9",
 };
+
 const priorityOrder = {
   "紧急且重要": 1,
   "紧急": 2,
@@ -61,6 +63,7 @@ const initialTasks = [
     assignee: "",
     deadline: "",
     remark: "",
+    completed_at: "",
   },
   {
     id: uuidv4(),
@@ -71,6 +74,7 @@ const initialTasks = [
     assignee: "李华",
     deadline: "",
     remark: "",
+    completed_at: "",
   },
 ];
 
@@ -84,14 +88,17 @@ function TaskForm({ onAdd }) {
     remark: "",
   });
 
+  // 处理表单输入
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
+  // 处理快捷DDL
   function handleQuickDDL(type) {
     setForm({ ...form, deadline: getQuickDDL(type) });
   }
 
+  // 表单提交
   function handleSubmit(e) {
     e.preventDefault();
     if (!form.summary) {
@@ -102,6 +109,7 @@ function TaskForm({ onAdd }) {
       ...form,
       id: uuidv4(),
       created_at: new Date().toISOString(),
+      completed_at: "",  // 新任务没有完成日期
     });
     setForm({
       summary: "",
@@ -149,6 +157,7 @@ function TaskForm({ onAdd }) {
         value={form.priority}
         onChange={handleChange}
         className="select"
+        required
       >
         <option>紧急且重要</option>
         <option>紧急</option>
@@ -160,6 +169,7 @@ function TaskForm({ onAdd }) {
         value={form.status}
         onChange={handleChange}
         className="select"
+        required
       >
         <option value="todo">todo</option>
         <option value="ing">ing</option>
@@ -224,9 +234,7 @@ function EditableCell({ value, type, options, onSave }) {
   }
 
   function handleKeyDown(e) {
-    if (e.key === "Enter" && e.shiftKey) {
-      setEditValue(prev => prev);
-    } else if (e.key === "Enter") {
+    if (e.key === "Enter") {
       setEditing(false);
       if (editValue !== value) {
         onSave(editValue);
@@ -283,7 +291,12 @@ function EditableCell({ value, type, options, onSave }) {
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className="input"
-          style={{ resize: "none", lineHeight: "1.5", minHeight: "50px", zIndex: 10 }}
+          style={{
+            resize: "none",
+            lineHeight: "1.5",
+            minHeight: "50px",
+            zIndex: 10,
+          }}
         />
       );
     }
@@ -298,7 +311,7 @@ function EditableCell({ value, type, options, onSave }) {
     padding: "3px 8px",
     borderRadius: 6,
     fontWeight: 500,
-    textAlign: type === 'text' ? 'left' : 'center',
+    textAlign: type === "text" ? "left" : "center",
     boxSizing: "border-box",
     background: "#fff",
     color: "#000",
@@ -307,16 +320,16 @@ function EditableCell({ value, type, options, onSave }) {
   if (type === "select" && options && options.length === 4 && options[0] === "紧急且重要") {
     style.background = priorityColors[value];
     style.color = "#fff";
-    style.whiteSpace = 'nowrap';
+    style.whiteSpace = "nowrap";
   } else if (type === "select" && options && options.length === 4) {
     style.background = statusColors[value];
     style.color = "#fff";
-    style.whiteSpace = 'nowrap';
+    style.whiteSpace = "nowrap";
   }
 
   return (
     <span style={style} onClick={handleClick}>
-      {type === 'date' && value ? formatDateMMDD(value) : value}
+      {type === "date" && value ? formatDateMMDD(value) : value}
     </span>
   );
 }
@@ -327,7 +340,13 @@ function TaskRow({ task, onUpdate, onDelete }) {
       alert("任务描述不能为空");
       return;
     }
-    onUpdate(task.id, { ...task, [field]: newValue });
+
+    if (field === "status" && newValue === "done" && !task.completed_at) {
+      // 如果任务状态是 "done" 且没有完成日期，自动设置完成日期
+      onUpdate(task.id, { ...task, [field]: newValue, completed_at: new Date().toISOString() });
+    } else {
+      onUpdate(task.id, { ...task, [field]: newValue });
+    }
   }
 
   return (
@@ -377,6 +396,12 @@ function TaskRow({ task, onUpdate, onDelete }) {
           onSave={(v) => saveField("remark", v)}
         />
       </td>
+      {task.status === "done" && (
+        <td style={{ width: 100 }}>
+          {/* 显示完成日期 */}
+          <span>{formatDateMMDD(task.completed_at)}</span>
+        </td>
+      )}
       <td style={{ width: 60 }}>
         <button onClick={() => onDelete(task.id)} className="btn-delete">
           删除
@@ -389,11 +414,24 @@ function TaskRow({ task, onUpdate, onDelete }) {
 function TaskList({ tasks, onUpdate, onDelete }) {
   const nonDoneTasks = tasks.filter((task) => task.status !== "done");
   const doneTasks = tasks.filter((task) => task.status === "done").sort((a, b) => {
-    return new Date(b.created_at) - new Date(a.created_at);
+    // 对已完成任务按完成日期降序排序，空值排最后
+    const completedAtA = a.completed_at ? new Date(a.completed_at) : -Infinity;
+    const completedAtB = b.completed_at ? new Date(b.completed_at) : -Infinity;
+
+    return completedAtB - completedAtA; // 降序排列
   });
 
+  // 对未完成任务按照优先级和DDL进行排序
   const sortedNonDoneTasks = [...nonDoneTasks].sort((a, b) => {
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
+    // 排序优先级
+    const priorityComparison = priorityOrder[a.priority] - priorityOrder[b.priority];
+    if (priorityComparison !== 0) return priorityComparison;
+
+    // 如果优先级相同，则按照DDL升序排序（空值排最后）
+    const deadlineA = a.deadline ? new Date(a.deadline) : Infinity;
+    const deadlineB = b.deadline ? new Date(b.deadline) : Infinity;
+
+    return deadlineA - deadlineB;
   });
 
   return (
@@ -473,9 +511,10 @@ function TaskList({ tasks, onUpdate, onDelete }) {
               <th style={{ width: 250 }}>任务描述</th>
               <th style={{ width: 65 }}>当前进展</th>
               <th style={{ width: 80 }}>对接人</th>
-              <th style={{ width: 55 }}>DDL</th>
+              <th style={{ width: 65 }}>DDL</th>
               <th style={{ width: 210 }}>备注</th>
-              <th style={{ width: 60 }}>操作</th>
+              <th style={{ width: 65 }}>完成日期</th>
+              <th style={{ width: 65 }}>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -530,6 +569,11 @@ function App() {
   }
 
   function updateTask(id, newTask) {
+    // 如果任务状态变为 "done"，自动填充完成日期
+    if (newTask.status === "done" && !newTask.completed_at) {
+      newTask.completed_at = new Date().toISOString();
+    }
+    
     pushHistory(tasks.map((t) => (t.id === id ? newTask : t)));
   }
 
@@ -677,7 +721,7 @@ function App() {
         td:nth-child(3),
         td:nth-child(7) {
           text-align: left;
-          white-space: normal; /* 自动换行 */
+          white-space: normal;
         }
         td {
           text-align: center;
