@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
+import GanttChart from "react-gantt-chart";
 
 // Electron 渲染进程 API
 const { ipcRenderer } = window.require ? window.require('electron') : {};
@@ -62,7 +63,7 @@ const initialTasks = [
     status: "todo",
     assignee: "",
     deadline: "",
-    remark: "",
+    remark: "修复生产环境中的bug，导致系统崩溃，需要在今天之内完成。", // Sample remark for testing
     completed_at: "",
   },
   {
@@ -225,6 +226,7 @@ function TaskForm({ onAdd }) {
 function EditableCell({ value, type, options, onSave }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(value || "");
+  const [isExpanded, setIsExpanded] = useState(false); // State for expanding the remark
 
   function handleBlur() {
     setEditing(false);
@@ -234,7 +236,9 @@ function EditableCell({ value, type, options, onSave }) {
   }
 
   function handleKeyDown(e) {
-    if (e.key === "Enter") {
+      if (e.key === "Enter" && e.shiftKey) {
+      setEditValue(prev => prev);
+    } else if (e.key === "Enter") {
       setEditing(false);
       if (editValue !== value) {
         onSave(editValue);
@@ -246,8 +250,14 @@ function EditableCell({ value, type, options, onSave }) {
   }
 
   function handleClick(e) {
-    e.stopPropagation();
+    e.stopPropagation();  // Prevent editing when clicking on the cell itself
     setEditing(true);
+  }
+
+  // Remark specific logic for expansion/collapse
+  function toggleRemarkExpansion(e) {
+    e.stopPropagation();  // Prevent editing when toggling expand/collapse
+    setIsExpanded((prev) => !prev);
   }
 
   if (editing) {
@@ -317,6 +327,7 @@ function EditableCell({ value, type, options, onSave }) {
     color: "#000",
   };
 
+  // Apply color for priority or status if necessary
   if (type === "select" && options && options.length === 4 && options[0] === "紧急且重要") {
     style.background = priorityColors[value];
     style.color = "#fff";
@@ -327,12 +338,48 @@ function EditableCell({ value, type, options, onSave }) {
     style.whiteSpace = "nowrap";
   }
 
+  // Limit content to three lines when collapsed
+  const isLongRemark = value && value.length > 100; // If the content is long, we will collapse it
+  const displayRemark = isExpanded || !isLongRemark ? value : value.split("\n").slice(0, 2).join("\n"); // Show full or truncated content
+
   return (
     <span style={style} onClick={handleClick}>
-      {type === "date" && value ? formatDateMMDD(value) : value}
+      {type === "date" && value ? formatDateMMDD(value) : displayRemark}
+      
+      {isLongRemark && !isExpanded && (
+        <span
+          onClick={toggleRemarkExpansion}
+          style={{
+            color: "#40a9ff",
+            cursor: "pointer",
+            fontSize: "12px",
+            marginLeft: "8px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          展开
+        </span>
+      )}
+      
+      {isExpanded && type === "text" && (
+        <span
+          onClick={toggleRemarkExpansion}
+          style={{
+            color: "#40a9ff",
+            cursor: "pointer",
+            fontSize: "12px",
+            marginLeft: "8px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          收起
+        </span>
+      )}
     </span>
   );
 }
+
+
 
 function TaskRow({ task, onUpdate, onDelete }) {
   function saveField(field, newValue) {
