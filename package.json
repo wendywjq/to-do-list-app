@@ -6,7 +6,6 @@
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-gantt-chart": "^0.3.0-rc.11",
     "react-scripts": "5.0.1",
     "uuid": "^13.0.0",
     "web-vitals": "^5.1.0"

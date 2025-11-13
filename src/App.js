@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
-import GanttChart from "react-gantt-chart";
 
 // Electron 渲染进程 API
 const { ipcRenderer } = window.require ? window.require('electron') : {};
